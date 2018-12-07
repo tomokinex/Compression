@@ -15,8 +15,9 @@
 #include<vector>
 #include<math.h>
 #include<assert.h>
+#include<iostream>
 
-bool decompress(char s1, char s2, int *head, int *len  ){
+bool decompress(unsigned char s1, unsigned char s2, int *head, int *len  ){
     //圧縮bit
     if((int)s1 < 0){
         short comp = (s1 << 8) & s2;
@@ -27,20 +28,21 @@ bool decompress(char s1, char s2, int *head, int *len  ){
       return false;          
     }
 }
-void compress(int head, int len, char* s1, char* s2){
+void compress(int head, int len, unsigned char* s1, unsigned char* s2){
     short comp = c_bits_mask;
     assert(len >= 2);
     head <<= length_bit;
-    comp &= head;
-    comp &= (len-2);
-    *s2 = (char)(comp & ((1<<8)-1));
-    *s1 = (char)(comp >> 8);
+    comp |= head;
+    comp |= (len-2);
+    std::cout << std::hex<< std::showbase<<"h : " << (head >> length_bit) << "len : " << len << "comp " << comp << std::endl; 
+    *s2 = (unsigned char)(comp & ((1<<8)-1));
+    *s1 = (unsigned char)(comp >> 8);
 }
 
 class ring_buffer{
     public:
     int m_size, m_head, m_cov;
-    std::vector<char> v;
+    std::vector<unsigned char> v;
     ring_buffer(int size){
         m_size = size;
         v.resize(size);
@@ -78,43 +80,44 @@ class ring_buffer{
     bool Isfilling(){
         return !(m_cov < m_size);
     }
-    void push(char value){
+    void push(unsigned char value){
         v[m_head] = value;
         head_inc();
         conv_inc();
     }
-    char pop(int iterator){
+    unsigned char pop(int iterator){
         return v[iterator%m_size];
     }
 
     //windowのheadとfileのhead固定
-    int matching(std::vector<char>::iterator s, int w_head_init, int max_num){
+    int matching(std::vector<unsigned char>::iterator s, int w_head_init, int max_num){
         int w_head = w_head_init;
         int len = 0;
         while(len <= max_num){
-            len = 0;
-            if(pop(w_head) != s[len]){
+            //std::cout << "pop[" << w_head << "] : " <<(int)pop(w_head) << " s+" << len << " : " << (int)(*s+len) << std::endl;             
+            if(pop(w_head) != *(s+len)){
                 break;
             }else{
                 w_head++;
                 len++;            
             }
         }
+        //std::cout << "len: " << len << std::endl;
         return len;
     }
 
-    bool matching_cycle(std::vector<char>::iterator s, int*head, int*len){
+    bool matching_cycle(std::vector<unsigned char>::iterator s, int left_num,int*head, int*len){
         int max_len = 0;
         int w_head = 0;
 
         for(int i=0;i<m_cov;i++){
-            int t_len = matching(s, Isbottom()+i, std::min(length, m_cov));
+            int t_len = matching(s, Isbottom()+i, std::min(m_cov-i, left_num));
             if(t_len > max_len){
                 max_len = t_len;
                 w_head = i;
             }
         }
-        if(max_len != 0){
+        if(max_len >= 2){
             *head = w_head;
             *len = max_len;
             return true;
