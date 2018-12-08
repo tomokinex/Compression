@@ -6,7 +6,7 @@ all: main
 main: main.o
 	$(CPP) -o  main  main.o
 
-main.o: main.cpp libs.h
+main.o: main.cpp LZSS.h
 	$(CPP) -c $(FLAG) main.cpp 
 
 clean:; rm -f *.o *~main
