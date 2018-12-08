@@ -17,14 +17,15 @@
 #include<assert.h>
 #include<iostream>
 namespace LZSS{
+    
 bool decompress(unsigned char s1, unsigned char s2, int *head, int *len){
     //圧縮bit
     if((s1 >> 7) == 1){
         short comp = ((short)s1 << 8) | (short)s2;
         *len = (int)(comp & length_mask) + 2;
         *head = (int)((comp & windowsize_mask) >> length_bit);
-        std::cout << std::hex << std::showbase << (int)s1 << " " << (int)s2 << std::endl;
-        std::cout << "h: " << *head << " l: " << *len << std::endl;
+        //std::cout << std::hex << std::showbase << (int)s1 << " " << (int)s2 << std::endl;
+        //std::cout << "h: " << *head << " l: " << *len << std::endl;
         return true;
     }else{
       return false;          
