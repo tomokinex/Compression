@@ -1,12 +1,12 @@
 //ASCII8bit(1bit+7bit)を対象
 //圧縮すると16bit(1bit+12bit+3bit)valid,windowsize,lengthの順
-//lengthは必ず2以上になるので, +2した値を用いる(ex 000はlength:2)
+//lengthは必ず2以上になるので, +2した値を用いる(ex 000はlength:2, 111はlength:9)
 
 //windowの再起参照は実装していない
 #define windowsize_bit 12
 #define length_bit 3
 #define windowsize (1 << windowsize_bit)
-#define length (1 << length_bit) + 2
+#define max_length (1 << length_bit) + 1
 #define c_bits (1 + windowsize_bit + length_bit)
 #define length_mask (1 << length_bit) - 1
 #define windowsize_mask ( (1 << windowsize_bit) - 1 ) << length_bit
@@ -17,7 +17,7 @@
 #include<assert.h>
 #include<iostream>
 namespace LZSS{
-    
+//windowsizeをはみ出す際の重複を考慮してないような   
 bool decompress(unsigned char s1, unsigned char s2, int *head, int *len){
     //圧縮bit
     if((s1 >> 7) == 1){
@@ -37,6 +37,7 @@ void compress(int head, int len, unsigned char* s1, unsigned char* s2){
     head <<= length_bit;
     comp |= head;
     comp |= (len-2);
+    std::cout << "head: " << head << " len: " << len << std::endl;
     //std::cout << std::hex<< std::showbase<<"h : " << (head >> length_bit) << "len : " << len << "comp " << comp << std::endl; 
     *s2 = (unsigned char)(comp & ((1<<8)-1));
     *s1 = (unsigned char)(comp >> 8);
@@ -93,16 +94,30 @@ class ring_buffer{
     }
 
     //windowのheadとfileのhead固定
-    int matching(std::vector<unsigned char>::iterator s, int w_head_init, int max_num){
+    int matching(std::vector<unsigned char>::iterator s, int w_head_init, int left_window_size, int left_file_size){
         int w_head = w_head_init;
         int len = 0;
-        while(len <= max_num){
+        bool recursive = true;
+        while(len < std::min(left_window_size,left_file_size) ){
             //std::cout << "pop[" << w_head << "] : " <<(int)pop(w_head) << " s+" << len << " : " << (int)(*s+len) << std::endl;             
             if(pop(w_head) != *(s+len)){
+                recursive = false;
                 break;
             }else{
                 w_head++;
                 len++;            
+            }
+        }
+
+        if(recursive){
+            int len_r = 0;
+            while(len < left_file_size){
+                if(*(s+len_r) != *(s+len)){
+                    break;
+                }else{
+                    len_r++;
+                    len++;
+                }
             }
         }
         //std::cout << "len: " << len << std::endl;
@@ -114,15 +129,20 @@ class ring_buffer{
         int w_head = 0;
 
         for(int i=0;i<m_cov;i++){
-            int t_len = matching(s, Isbottom()+i, std::min(m_cov-i, left_num));
+            int t_len = matching(s, Isbottom()+i, m_cov-i, left_num);
             if(t_len > max_len){
                 max_len = t_len;
                 w_head = i;
             }
         }
         if(max_len >= 2){
+            if(max_len >= max_length){
+                *len = max_length;
+            }else{
+                *len = max_len;
+            }
             *head = w_head;
-            *len = max_len;
+            
             return true;
         }else{
             return false;
@@ -137,11 +157,12 @@ class ring_buffer{
 	    while(file_size > 0){
 		    int head = 0;
 		    int len = 0;
-		    //圧縮成功
+		    //圧縮ができる
 		    if(m_ring.matching_cycle(file_pointer,file_size-1,&head, &len)){
 			    unsigned char s1 = 0;
 			    unsigned char s2 = 0;
 			    compress(m_ring.Iscov()-head-1, len, &s1, &s2);
+                std::cout << "Iscov: " << m_ring.Iscov() << " head: " << head << " len: " << len << std::endl;
 			    comp.push_back(s1);
 			    comp.push_back(s2);
 			    for(auto j=0;j<len;j++){
@@ -149,7 +170,7 @@ class ring_buffer{
 				    file_pointer++;
 				    file_size--;
 			    }
-		    //失敗
+		    //圧縮ができない
 		    }else{
 			    comp.push_back(*file_pointer);
 			    m_ring.push(*file_pointer);
@@ -166,10 +187,14 @@ class ring_buffer{
             int head = 0;
             int len = 0;
             if(decompress(s1,s2,&head,&len)){
-                for(int j=0;j<len;j++){
+                std::cout << "head: " << head << " len: " << len << std::endl;
+                //if(head > len){
                     int t_decomp_size = decomp.size();
-                    decomp.push_back(decomp[t_decomp_size-1-head+j]);
-                }
+                    for(int j=0;j<len;j++){
+                        decomp.push_back(decomp[t_decomp_size-1-head+j]);
+                    }
+                
+                //2byte分読んだことにする
                 i++;
             }else{
                 decomp.push_back(s1);
