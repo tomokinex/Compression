@@ -1,13 +1,10 @@
-#include<vector>
-#include<iostream>
-#include<math.h>
-#include<algorithm>
+#include "defines.h"
 namespace Huff{
 
     class tree{
         public:
         int m_num;
-        unsigned char m_val;
+        unsigned int m_val;
         int m_depth;
         //右を小さくする
         tree* m_parent;
@@ -36,6 +33,9 @@ namespace Huff{
         int Isnum(){
             return m_num;
         }
+        unsigned int Isval(){
+            return m_val;
+        }
         void Setparent(tree* parent){
             m_parent = parent;
         }
@@ -48,7 +48,7 @@ namespace Huff{
         void Setnum(int num){
             m_num = num;
         }
-        void Setval(unsigned char val){
+        void Setval(unsigned int val){
             m_val = val;
         }
         tree* Callparent(){
@@ -93,7 +93,7 @@ namespace Huff{
             }
             return std::max(right_d, left_d);
         }
-        void push_depth_recursive(std::vector<std::vector<unsigned char>>& heap){
+        void push_depth_recursive(std::vector<std::vector<unsigned int>>& heap){
             if(m_right != nullptr){
                 m_right->push_depth_recursive(heap);
             }
@@ -106,13 +106,64 @@ namespace Huff{
         }
     };
 
-    void normalize_tree(std::vector<tree> &hist, std::vector<std::vector<unsigned char>> &comp_tree){
+    class n_tree{
+        public:
+        n_tree* m_right;
+        n_tree* m_left;
+        unsigned int m_val;
+        n_tree(unsigned int val=0, n_tree* right=nullptr, n_tree*left=nullptr){
+            m_val = val;
+            m_right = right;
+            m_left = left;
+        }
+        void print(int i){
+            if(m_right != nullptr){
+                std::cout << "right " << std::endl;
+                m_right->print(i+1);
+            }
+            if(m_left != nullptr){
+                std::cout << "left " << std::endl;
+                m_left->print(i+1);
+            }
+            if(m_left == nullptr && m_right == nullptr){
+                std::cout << "val: " << m_val << std::endl;
+            }
+        }
+        //(d,root)
+        std::pair<int,int> search(unsigned int target, int d=0, int root=0){
+            std::pair<int,int> r,l;
+            r = std::pair<int,int>(0,0);
+            l = std::pair<int,int>(0,0);
+            if(m_right != nullptr){
+                root |= (1 << d+1);
+                r = m_right->search(target,d+1,root);
+            }   
+            if(m_left != nullptr){
+                l = m_left->search(target,d+1,root);
+            }
+            if(m_left == nullptr && m_right == nullptr){
+                if(target == m_val){
+                    return std::pair<int,int>(d,root);
+                }else{
+                    return std::pair<int,int>(0,0);
+                }
+            }
+            if(r.first != 0){
+                return r;
+            }else{
+                return l;
+            }
+        }
+    };
+
+    void normalize_tree(std::vector<tree> &hist, std::vector<std::vector<unsigned int>> &comp_tree){
         int max_depth = hist[hist.size()-1].set_depth_recursive(0);
         comp_tree.resize(max_depth+1);
         hist[hist.size()-1].push_depth_recursive(comp_tree);
         for(int i=0;i<=max_depth;i++){
             std::sort(comp_tree[i].begin(), comp_tree[i].end());
-        }/*
+        }
+        /*
         for(int i=0;i<comp_tree.size();i++){
             std::cout << "dp: " << i << std::endl;
             for(auto it = comp_tree[i].begin();it != comp_tree[i].end();it++){
@@ -122,7 +173,34 @@ namespace Huff{
         */
     }
 
+    n_tree* make_normalized_tree(std::vector<std::vector<unsigned int>> &comp_tree){
+        
+        int d_size = comp_tree.size();
+        std::vector<n_tree*> overload_trees;
+        for(int i=d_size-1; i>0;i--){
+
+            std::vector<n_tree*> depth_trees;
+            for(auto it = comp_tree[i].begin();it != comp_tree[i].end();it++){
+                n_tree* tmp = new n_tree(*it,nullptr,nullptr);
+                depth_trees.push_back(tmp);
+            }
+            std::copy(overload_trees.begin(),overload_trees.end(), std::back_inserter(depth_trees));
+            std::vector<n_tree*>().swap(overload_trees);
+            overload_trees.resize(0);
+            std::cout << "depth: " << i << " d_tree_size: " << depth_trees.size() << std::endl;             
+            for(int j=0;j<depth_trees.size()/2;j++){                    
+                n_tree* tmp = new n_tree(0,depth_trees[2*j+1],depth_trees[2*j]);
+                overload_trees.push_back(tmp);
+            }
+            std::cout << "depth: " << i << " o_tree_size: " << overload_trees.size() << std::endl;             
+        }
+        //overload_trees[0]->print(0);
+        return overload_trees[0];
+    }
+
     void compress(std::vector<tree> &hist, int*comp_line, int*comp_bit, unsigned char target){
+
+        
         int m_comp_line = 0;
         int m_comp_bit = 0;
         tree *init_tree = &hist[(int)target];
@@ -140,6 +218,7 @@ namespace Huff{
         }
         *comp_bit = m_comp_bit;
         *comp_line = m_comp_line;
+        
     }
 
     void min_search(std::vector<tree> &hist, int*min_index1, int*min_index2){
@@ -166,14 +245,7 @@ namespace Huff{
         *min_index2 = index2;
     }
 
-    void Huff_compress(std::vector<unsigned char>& file, std::vector<unsigned char>& comp){
-
-        std::vector<tree> m_tree(256,tree());
-        //histgram作成
-        for(int i=0;i<file.size();i++){
-            m_tree[(int)file[i]].add();
-            m_tree[(int)file[i]].Setval(file[i]);
-        }
+    void make_huff_tree(std::vector<tree> &m_tree){
         //treeの作成
         int min_index1 = -2;
         int min_index2 = -2;
@@ -191,31 +263,138 @@ namespace Huff{
                 break;
             }
         }
+    }
 
-        int line= 0;
-        int bits = 0;
-        /*
-        for(auto it = m_tree.begin();it != m_tree.end();it++){
-            if(!it->Ischild() && it->Isnum() != 0){
-                compress(m_tree,&line,&bits,it->m_val);
-                std::cout << "value: " << (it->m_val) << " line: " << line << " size: " << bits <<std::endl;
+    bool push_bit_entry(std::vector<unsigned char>& comp,unsigned char* buffer, int* line, unsigned int push_line, int push_line_size){
+                
+    }
+
+    //2種類のハフマン化を施す
+    void compress_to_file(std::vector<unsigned char>& file, n_tree* tree_top1, n_tree* tree_top2, std::vector<unsigned char>& comp){
+        //32bit
+        unsigned char buffer = 0;
+        int line  = 0;
+        //pairは長さ, 文字
+        for(int i=0;i<file.size();i++){
+            if((file[i] >> 7) == 1){                
+                short comp_line = ((short)file[i] << 8) | (short)file[i+1];
+                unsigned int head = (unsigned int)((comp_line & windowsize_mask) >> length_bit);
+                unsigned int len = (unsigned int)(comp_line & length_mask);
+                std::pair<int,int> comp_line_pair = tree_top2->search((unsigned int)head);
+                i++;
+
+                if(line < 8){
+                    buffer <<= 1;
+                    buffer |= 1;
+                    line++;
+                }else{
+                    comp.push_back(buffer);
+                    buffer = 0;
+                    line = 0;
+                }
+                for(int i=comp_line_pair.first;i>0;i--){
+                    if(line < 8){
+                        buffer <<= 1;
+                        buffer |= ((comp_line_pair.second >> (i-1)) & 1);
+                    }else{
+                        comp.push_back(buffer);
+                        buffer = 0;
+                        line = 0;
+                    }
+                }
+                for(int i=length_bit;i>0;i--){
+                    if(line < 8){
+                        buffer <<= 1;
+                        buffer |= ((len >> (i-1)) & 1);
+                    }else{
+                        comp.push_back(buffer);
+                        buffer = 0;
+                        line = 0;
+                    }
+                }
+            }else{
+                std::pair<int,int> comp_line_pair = tree_top1->search((unsigned int)file[i]);
+                if(line < 8){
+                    buffer <<= 1;
+                    //buffer |= 1;
+                    line++;
+                }else{
+                    comp.push_back(buffer);
+                    buffer = 0;
+                    line = 0;
+                }
+                for(int i=comp_line_pair.first;i>0;i--){
+                    if(line < 8){
+                        buffer <<= 1;
+                        buffer |= ((comp_line_pair.second >> (i-1)) & 1);
+                    }else{
+                        comp.push_back(buffer);
+                        buffer = 0;
+                        line = 0;
+                    }
+                }
+
+            }
+        }   
+        if(line < 8){
+            buffer <<= (8-line);
+            comp.push_back(buffer);
+        }    
+    }
+
+
+    void Huff_compress(std::vector<unsigned char>& file, std::vector<unsigned char>& comp){
+
+        std::vector<tree> tree1((1 << word_size_bit),tree());
+        std::vector<tree> tree2((1 << windowsize_bit),tree());
+
+        //histgram作成
+        for(int i=0;i<file.size();i++){
+            if((file[i] >> 7) == 1){
+                short comp_line = ((short)file[i] << 8) | (short)file[i+1];
+                unsigned int head = (unsigned int)((comp_line & windowsize_mask) >> length_bit);
+                tree2[head].add();
+                tree2[head].Setval(head);
+                i++;
+            }else{
+                tree1[(unsigned int)file[i]].add();
+                tree1[(unsigned int)file[i]].Setval(file[i]);
             }
         }
-        */
-        std::vector<std::vector<unsigned char>> comp1;
-        normalize_tree(m_tree, comp1);
+        make_huff_tree(tree1);
+        make_huff_tree(tree2);
+        std::vector<std::vector<unsigned int>> comp1;
+        std::vector<std::vector<unsigned int>> comp2;
+        //treeの葉を深さごとに分類
+        normalize_tree(tree1, comp1);
+        normalize_tree(tree2, comp2);
+        //正規化したハフマン木を作成
+        n_tree* n_tree_top1 = make_normalized_tree(comp1);
+        n_tree* n_tree_top2 = make_normalized_tree(comp2);
 
+        /*
+        n_tree_top->print(0); 
+        std::pair<int,int> a = n_tree_top->search(97);
+        std::pair<int,int> b = n_tree_top->search(98);
+        std::pair<int,int> c = n_tree_top->search(99);
+        std::cout << "a: " << a.first << " " << a.second << std::endl;        
+        std::cout << "b: " << b.first << " " << b.second << std::endl;
+        std::cout << "c: " << c.first << " " << c.second << std::endl;
+        int line= 0;
+        int bits = 0;
+        */
+        
         //treeの情報をcompに書きだす
 
         //treeを使ってfileの文字をcompに書き出す
 
-
-        m_tree[m_tree.size()-1].print();
-        std::vector<tree>().swap(m_tree);
-        std::vector<std::vector<unsigned char>>().swap(comp1);
+        //tree1[tree1.size()-1].print();
+        std::vector<tree>().swap(tree1);
+        std::vector<tree>().swap(tree2);
+        std::vector<std::vector<unsigned int>>().swap(comp1);
+        std::vector<std::vector<unsigned int>>().swap(comp2);
     }
     void Huff_decompress(std::vector<unsigned char>& in, std::vector<unsigned char>& decomp){
-
 
     }
 }

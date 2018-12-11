@@ -31,8 +31,8 @@ int main(int argc, char** argv){
 		file.push_back(c);
 	}
 	fp.close();
-	//Huff::Huff_compress(file,comp1);
-	
+	Huff::Huff_compress(file,comp1);
+	/*
 	LZSS::LZSS_compress(file, comp1);
 
 	LZSS::LZSS_decompress(comp1,decomp1);
@@ -52,7 +52,7 @@ int main(int argc, char** argv){
 		cout << i << " : ";
 		cout << hex << showbase << (int)decomp1[i] << endl;
 	}
-	
+	*/
 	//free
 	vector<unsigned char>().swap(file);
 	vector<unsigned char>().swap(comp1);

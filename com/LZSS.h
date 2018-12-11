@@ -3,19 +3,7 @@
 //lengthは必ず2以上になるので, +2した値を用いる(ex 000はlength:2, 111はlength:9)
 
 //windowの再起参照は実装していない
-#define windowsize_bit 12
-#define length_bit 3
-#define windowsize (1 << windowsize_bit)
-#define max_length (1 << length_bit) + 1
-#define c_bits (1 + windowsize_bit + length_bit)
-#define length_mask (1 << length_bit) - 1
-#define windowsize_mask ( (1 << windowsize_bit) - 1 ) << length_bit
-#define c_bits_mask 1 << (c_bits - 1)
-
-#include<vector>
-#include<math.h>
-#include<assert.h>
-#include<iostream>
+#include "defines.h"
 namespace LZSS{
 //windowsizeをはみ出す際の重複を考慮してないような   
 bool decompress(unsigned char s1, unsigned char s2, int *head, int *len){
