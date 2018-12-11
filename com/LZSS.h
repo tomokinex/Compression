@@ -25,7 +25,7 @@ void compress(int head, int len, unsigned char* s1, unsigned char* s2){
     head <<= length_bit;
     comp |= head;
     comp |= (len-2);
-    std::cout << "head: " << head << " len: " << len << std::endl;
+    //std::cout << "head: " << head << " len: " << len << std::endl;
     //std::cout << std::hex<< std::showbase<<"h : " << (head >> length_bit) << "len : " << len << "comp " << comp << std::endl; 
     *s2 = (unsigned char)(comp & ((1<<8)-1));
     *s1 = (unsigned char)(comp >> 8);
@@ -150,7 +150,7 @@ class ring_buffer{
 			    unsigned char s1 = 0;
 			    unsigned char s2 = 0;
 			    compress(m_ring.Iscov()-head-1, len, &s1, &s2);
-                std::cout << "Iscov: " << m_ring.Iscov() << " head: " << head << " len: " << len << std::endl;
+                //std::cout << "Iscov: " << m_ring.Iscov() << " head: " << head << " len: " << len << std::endl;
 			    comp.push_back(s1);
 			    comp.push_back(s2);
 			    for(auto j=0;j<len;j++){

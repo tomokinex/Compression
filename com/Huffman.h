@@ -247,16 +247,22 @@ namespace Huff{
 
     void make_huff_tree(std::vector<tree> &m_tree){
         //treeの作成
-        int min_index1 = -2;
-        int min_index2 = -2;
+        int min_index1 = 0;
+        int min_index2 = 0;
+        min_search(m_tree, &min_index1, &min_index2);
         while(min_index1 != -1 && min_index2 != -1){
             min_search(m_tree, &min_index1, &min_index2);
+            std::cout << "min1: " << min_index1 << " min2: " << min_index2 << std::endl;
             if(min_index1 != -1 && min_index2 != -1){
-                tree temp_tree = tree();
-                temp_tree.Setright(&m_tree[min_index1]);
-                temp_tree.Setleft(&m_tree[min_index2]);
-                temp_tree.Setnum(m_tree[min_index1].Isnum()+m_tree[min_index2].Isnum());
-                m_tree.push_back(temp_tree);
+            std::cout << "min1_p:"  << std::endl;
+            m_tree[min_index1].print();
+            std::cout << "min2_p:"  << std::endl;
+            m_tree[min_index2].print();
+                tree* temp_tree = new tree();
+                temp_tree->Setright(&m_tree[min_index1]);
+                temp_tree->Setleft(&m_tree[min_index2]);
+                temp_tree->Setnum(m_tree[min_index1].Isnum()+m_tree[min_index2].Isnum());
+                m_tree.push_back(*temp_tree);
                 m_tree[min_index1].Setparent(&m_tree[m_tree.size()-1]);
                 m_tree[min_index2].Setparent(&m_tree[m_tree.size()-1]);
             }else{
@@ -271,6 +277,7 @@ namespace Huff{
 
     //2種類のハフマン化を施す
     void compress_to_file(std::vector<unsigned char>& file, n_tree* tree_top1, n_tree* tree_top2, std::vector<unsigned char>& comp){
+        
         //32bit
         unsigned char buffer = 0;
         int line  = 0;
@@ -335,7 +342,8 @@ namespace Huff{
                 }
 
             }
-        }   
+        }
+
         if(line < 8){
             buffer <<= (8-line);
             comp.push_back(buffer);
@@ -345,33 +353,44 @@ namespace Huff{
 
     void Huff_compress(std::vector<unsigned char>& file, std::vector<unsigned char>& comp){
 
-        std::vector<tree> tree1((1 << word_size_bit),tree());
-        std::vector<tree> tree2((1 << windowsize_bit),tree());
+        std::vector<tree> tree1((1 << word_size_bit));
+        std::vector<tree> tree2(1 << windowsize_bit);
 
         //histgram作成
         for(int i=0;i<file.size();i++){
             if((file[i] >> 7) == 1){
                 short comp_line = ((short)file[i] << 8) | (short)file[i+1];
-                unsigned int head = (unsigned int)((comp_line & windowsize_mask) >> length_bit);
+                int head = (int)((comp_line & windowsize_mask) >> length_bit);
                 tree2[head].add();
                 tree2[head].Setval(head);
+                tree2[head].print();
                 i++;
+                std::cout << "c_head: " << head << std::endl;
             }else{
                 tree1[(unsigned int)file[i]].add();
-                tree1[(unsigned int)file[i]].Setval(file[i]);
+                tree1[(unsigned int)file[i]].Setval((unsigned int)file[i]);
+                std::cout << "t_head: " << file[i] << std::endl;
             }
         }
+
         make_huff_tree(tree1);
         make_huff_tree(tree2);
+        std::cout << "tree1: size " << tree1.size() <<std::endl;
+        tree1[tree1.size()-1].print();
+        std::cout << "tree2: size " << tree2.size() <<std::endl;
+        tree2[tree2.size()-1].print();  
+
         std::vector<std::vector<unsigned int>> comp1;
         std::vector<std::vector<unsigned int>> comp2;
-        //treeの葉を深さごとに分類
-        normalize_tree(tree1, comp1);
-        normalize_tree(tree2, comp2);
-        //正規化したハフマン木を作成
-        n_tree* n_tree_top1 = make_normalized_tree(comp1);
-        n_tree* n_tree_top2 = make_normalized_tree(comp2);
 
+        //treeの葉を深さごとに分類
+        //normalize_tree(tree1, comp1);
+        //normalize_tree(tree2, comp2);
+        //正規化したハフマン木を作成
+        //n_tree* n_tree_top1 = make_normalized_tree(comp1);
+        //n_tree* n_tree_top2 = make_normalized_tree(comp2);
+
+        //compress_to_file(file,n_tree_top1,n_tree_top2, comp);
         /*
         n_tree_top->print(0); 
         std::pair<int,int> a = n_tree_top->search(97);
