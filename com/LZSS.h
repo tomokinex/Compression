@@ -2,10 +2,9 @@
 //圧縮すると16bit(1bit+12bit+3bit)valid,windowsize,lengthの順
 //lengthは必ず2以上になるので, +2した値を用いる(ex 000はlength:2, 111はlength:9)
 
-//windowの再起参照は実装していない
 #include "defines.h"
 namespace LZSS{
-//windowsizeをはみ出す際の重複を考慮してないような   
+    
 bool decompress(unsigned char s1, unsigned char s2, int *head, int *len){
     //圧縮bit
     if((s1 >> 7) == 1){
