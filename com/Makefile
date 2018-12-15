@@ -1,5 +1,5 @@
 CPP=g++
-FLAG=-O3 -std=c++17 -lm -g
+FLAG=-O3 -std=c++11 -lm -g
 
 all: main
 
