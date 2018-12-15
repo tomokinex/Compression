@@ -143,7 +143,6 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
         void table_input(n_tree_table& table,int d, int root){
 
             if(m_right == nullptr && m_left == nullptr){
-                //std::cout << "val: " << m_val << " d: " << d << " root: " << root << std::endl;
                table[m_val] = std::pair<int, unsigned int>(d, root); 
             }
 
@@ -244,7 +243,6 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
 
     //bit単位でfile入力するマン
     bool push_bit_entry(std::vector<unsigned char>& comp,unsigned char* buffer, int* line, unsigned int push_line, int push_line_size){
-        std::cout << "line: " << push_line << " line_size: " << push_line_size << std::endl; 
         int left_size = push_line_size;
         unsigned char m_buffer = *buffer;
         int m_line = *line; 
@@ -283,19 +281,14 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
                 unsigned int len = (unsigned int)(comp_line & length_mask);
                 std::pair<int,unsigned int> comp_line_pair = tree_top2[(unsigned int)head];
                 i++;
-                std::cout << "not comp line: 1" << std::endl;
                 push_bit_entry(comp,&buffer,&line,1,1);
-                std::cout << "not comp line head: " << head << std::endl;
                 push_bit_entry(comp,&buffer,&line,comp_line_pair.second,comp_line_pair.first);
-                std::cout << "not comp line len: " << len << std::endl;  
                 push_bit_entry(comp,&buffer,&line,len,length_bit);
                 
                 
             }else{
                 std::pair<int,unsigned int> comp_line_pair = tree_top1[(unsigned int)file[i]];
-                std::cout << "not comp line: 0" << std::endl;
                 push_bit_entry(comp,&buffer,&line,0,1);
-                std::cout << "not comp line file: " << (unsigned int)file[i] << std::endl;
                 push_bit_entry(comp,&buffer,&line,comp_line_pair.second,comp_line_pair.first);
             }
         }
@@ -310,7 +303,9 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
     //<深さ,値>のセットを深さの小さい順に並べていく, 終端は<0,0>大きさはそれぞれのbit
     //<8bit,8bit> × M, <12bit,12bit> × Nになる
     void  write_tree_to_file(depth_table& n_tree_top, int bit_size, unsigned char *into_buffer, int *line_size, std::vector<unsigned char>& comp){
+        int num_tree = 0;
         for(int i=0;i<n_tree_top.size();i++){
+            num_tree += n_tree_top[i].size();
             for(int j=0;j<n_tree_top[i].size();j++){
                 push_bit_entry(comp,into_buffer,line_size,(unsigned int)i,bit_size);
                 push_bit_entry(comp,into_buffer,line_size,(unsigned int)n_tree_top[i][j],bit_size);
@@ -318,6 +313,8 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
         }
         push_bit_entry(comp,into_buffer,line_size,0,bit_size);
         push_bit_entry(comp,into_buffer,line_size,0,bit_size);
+        //treeのsizeを出力する
+        std::cout << "output tree size: " << num_tree*bit_size*2/8 << "byte" << std::endl;
     }
 
     //main
@@ -335,11 +332,9 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
                 tree2[head].add();
                 tree2[head].Setval(head);
                 i++;
-                //std::cout << "c_head: " << head << std::endl;
             }else{
                 tree1[(unsigned int)file[i]].add();
                 tree1[(unsigned int)file[i]].Setval((unsigned int)file[i]);
-                //std::cout << "t_head: " << file[i] << std::endl;
             }
         }
 
