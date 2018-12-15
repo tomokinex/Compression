@@ -144,6 +144,7 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
 
             if(m_right == nullptr && m_left == nullptr){
                table[m_val] = std::pair<int, unsigned int>(d, root); 
+               //std::cout << "val: " << (int)m_val << " d: " << d << " root: " << root << std::endl;
             }
 
             if(m_right != nullptr){
@@ -242,11 +243,12 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
     }
 
     //bit単位でfile入力するマン
-    bool push_bit_entry(std::vector<unsigned char>& comp,unsigned char* buffer, int* line, unsigned int push_line, int push_line_size){
+    void push_bit_entry(std::vector<unsigned char>& comp,unsigned char* buffer, int* line, unsigned int push_line, int push_line_size){
+        //std::cout << "push line: " << push_line << " line_size: " << push_line_size << std::endl;
         int left_size = push_line_size;
         unsigned char m_buffer = *buffer;
         int m_line = *line; 
-        while(left_size + m_line >= 8){
+        while(left_size + m_line >= 8 ){
             int t_push_size = 8 - m_line;
             m_buffer <<= t_push_size;
             int t_in = push_line & ( (1 << left_size) - 1);
@@ -256,23 +258,27 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
             m_buffer = 0;
             left_size -= t_push_size;
             m_line = 0;
+            //std::cout << "push!" << std::endl;
         }
         if(left_size > 0){
             m_buffer <<= left_size;
             int t_in = (push_line & ((1 << left_size) -1));   
             m_buffer |= t_in;
-            *line += left_size;
+            *line = m_line + left_size;
             *buffer = m_buffer;
         }else{
             *line = m_line;
             *buffer = m_buffer;
         }
+        //std::cout << "left: " << (*line) << std::endl;
     }
 
     //2種類のハフマン化を施す
     void compress_to_file(std::vector<unsigned char>& file, n_tree_table &tree_top1, n_tree_table& tree_top2, std::vector<unsigned char>& comp){
         unsigned char buffer = 0;
         int line  = 0;
+
+        int sum_line_len = 0;
         //pairは長さ, 文字
         for(int i=0;i<file.size();i++){
             if((file[i] >> 7) == 1){                
@@ -281,28 +287,36 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
                 unsigned int len = (unsigned int)(comp_line & length_mask);
                 std::pair<int,unsigned int> comp_line_pair = tree_top2[(unsigned int)head];
                 i++;
+                //std::cout << "not comp line: 1" << std::endl;
                 push_bit_entry(comp,&buffer,&line,1,1);
+                //std::cout << "not comp line head: " << head << std::endl;
                 push_bit_entry(comp,&buffer,&line,comp_line_pair.second,comp_line_pair.first);
+                //std::cout << "not comp line len: " << len << std::endl;  
                 push_bit_entry(comp,&buffer,&line,len,length_bit);
-                
+
+                sum_line_len += (1+3+comp_line_pair.first);
                 
             }else{
                 std::pair<int,unsigned int> comp_line_pair = tree_top1[(unsigned int)file[i]];
+                //std::cout << "not comp line: 0" << std::endl;
                 push_bit_entry(comp,&buffer,&line,0,1);
+                //std::cout << "not comp line file: " << (unsigned int)file[i] << std::endl;
                 push_bit_entry(comp,&buffer,&line,comp_line_pair.second,comp_line_pair.first);
+
+                sum_line_len += (comp_line_pair.first);
             }
         }
 
         if(line < 8){
             buffer <<= (8-line);
         }
-        comp.push_back(buffer);            
+        comp.push_back(buffer);
     }
 
     //ハフマン木の情報を先頭に書き込み
     //<深さ,値>のセットを深さの小さい順に並べていく, 終端は<0,0>大きさはそれぞれのbit
     //<8bit,8bit> × M, <12bit,12bit> × Nになる
-    void  write_tree_to_file(depth_table& n_tree_top, int bit_size, unsigned char *into_buffer, int *line_size, std::vector<unsigned char>& comp){
+    int write_tree_to_file(depth_table& n_tree_top, int bit_size, unsigned char *into_buffer, int *line_size, std::vector<unsigned char>& comp){
         int num_tree = 0;
         for(int i=0;i<n_tree_top.size();i++){
             num_tree += n_tree_top[i].size();
@@ -315,6 +329,7 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
         push_bit_entry(comp,into_buffer,line_size,0,bit_size);
         //treeのsizeを出力する
         std::cout << "output tree size: " << num_tree*bit_size*2/8 << "byte" << std::endl;
+        return num_tree*bit_size*2/8;
     }
 
     //main
@@ -326,7 +341,7 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
 
         //histgram作成
         for(int i=0;i<file.size();i++){
-            if((file[i] >> 7) == 1){
+            if(((file[i] >> 7) & 1)  == 1){
                 short comp_line = ((short)file[i] << 8) | (short)file[i+1];
                 int head = (int)((comp_line & windowsize_mask) >> length_bit);
                 tree2[head].add();
@@ -340,38 +355,30 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
 
         make_huff_tree(tree1);
         make_huff_tree(tree2);
-        //std::cout << "tree1: size " << tree1.size() <<std::endl;
-        //tree1[tree1.size()-1].print(tree1);
-        //std::cout << "tree2: size " << tree2.size() <<std::endl;
-        //tree2[tree2.size()-1].print(tree2);  
 
         //深さでソートした要素集
         //圧縮したファイルのヘッダーにこれを入れる
-        depth_table comp1;
-        depth_table comp2;
+        depth_table comp1_table;
+        depth_table comp2_table;
 
         //treeの葉を深さごとに分類
-        normalize_tree(tree1, comp1);
-        normalize_tree(tree2, comp2);
+        normalize_tree(tree1, comp1_table);
+        normalize_tree(tree2, comp2_table);
         //free
         std::vector<tree>().swap(tree1);
         std::vector<tree>().swap(tree2);
 
         //正規化したハフマン木を作成
-        n_tree* n_tree_top1 = make_normalized_tree(comp1);
-        n_tree* n_tree_top2 = make_normalized_tree(comp2);
-        //std::cout << "n_tree1" << std::endl;
-        //n_tree_top1->print(0);
-        //std::cout << "n_tree2" << std::endl;
-        //n_tree_top2->print(0);
-        
+        n_tree* n_tree_top1 = make_normalized_tree(comp1_table);
+        n_tree* n_tree_top2 = make_normalized_tree(comp2_table);
+                
         //圧縮をO(1)で行うためのテーブル
         n_tree_table n_tree_table1(1 << word_size_bit);
         n_tree_table n_tree_table2(1 << windowsize_bit);
 
         //テーブルに圧縮情報をinput
         n_tree_top1->table_input(n_tree_table1,0,0);
-        n_tree_top2->table_input(n_tree_table1,0,0);
+        n_tree_top2->table_input(n_tree_table2,0,0);
 
         //free
         delete n_tree_top1;
@@ -380,15 +387,17 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
         //treeの情報をcompに書きだす
         unsigned char m_buffer = 0;
         int m_line_size = 0;
-        write_tree_to_file(comp1,word_size_bit,&m_buffer,&m_line_size,comp);
-        write_tree_to_file(comp2,windowsize_bit,&m_buffer,&m_line_size,comp);
+        int tree_size_sum = 0;
+        tree_size_sum += write_tree_to_file(comp1_table,word_size_bit,&m_buffer,&m_line_size,comp);
+        tree_size_sum += write_tree_to_file(comp2_table,windowsize_bit,&m_buffer,&m_line_size,comp);
         
         //tableを使ってfileの文字をcompに書き出す
         compress_to_file(file,n_tree_table1,n_tree_table2, comp);
     
+        std::cout << "not tree huffman size: " << comp.size() - tree_size_sum << "byte" << std::endl;
         //free
-        depth_table().swap(comp1);
-        depth_table().swap(comp2);
+        depth_table().swap(comp1_table);
+        depth_table().swap(comp2_table);
         n_tree_table().swap(n_tree_table1);
         n_tree_table().swap(n_tree_table2);
     }

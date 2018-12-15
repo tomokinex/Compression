@@ -81,19 +81,16 @@ int main(int argc, char** argv){
 		for(int i=0;i<comp2.size();i++){
 		  	outfp.write( reinterpret_cast<char*>(&comp2[i]), sizeof(unsigned char) );
 		}
-			cout << "ZSS + Huffman" << endl;
+			//cout << "ZSS + Huffman" << endl;
 			byte_counter_out += comp2.size();
-			cout << outfilename << " size: " << byte_counter_out << "byte" << endl;
-	}else{
+		}else{
 		for(int i=0;i<comp1.size();i++){
 		  	outfp.write( reinterpret_cast<char*>(&comp1[i]), sizeof(unsigned char) );
 		}
 			byte_counter_out += comp1.size();
-			cout << "LZSS only " << endl;
-			cout << outfilename << " size: " << byte_counter_out << "byte" << endl;
+			//cout << "LZSS only " << endl;
 	}
-
-
+	//cout << outfilename << " size: " << byte_counter_out << " byte ("  << 100.0*byte_counter_out / byte_counter_in << "%)" << endl;
 
 
 	outfp.close();
