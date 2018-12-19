@@ -402,8 +402,36 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
         n_tree_table().swap(n_tree_table2);
     }
 
-    void reading_tree(std::vector<unsigned char>& in, int *index, unsigned char*buffer, int*line_size, depth_table &table){
-
+    void reading_tree(std::vector<unsigned char>& in, int *index, unsigned char*buffer, int*line_size, depth_table &table, int bit_size){
+        
+        std::vector<std::pair<int,int>> tmp_table;
+        int i=(*index);
+        int d_size = 1;
+        while(i - (*index) < (1 << bit_size)){
+            int s1 = 0;
+            int s2 = 0;
+            if(bit_size == 8){
+                s1 = in[i];
+                s2 = in[i+1];
+                i += 2;
+            }else if(bit_size == 12) {
+                unsigned char tmp1 = in[i];
+                unsigned char tmp2 = in[i+1];
+                unsigned char tmp3 = in[i+2];
+                s1 = ((short)tmp1 << 8) | (((short)tmp2 & 0xf0 )>> 4);
+                s2 = (((short)tmp2 & 0xf) << 8) | (short)tmp3;
+                i += 3;
+            }
+            if(s1 == 0 && s2 == 0){
+                break;
+            }    
+            if(d_size < (s1+1)){
+                d_size = s1+1;
+                table.resize(d_size);
+            }
+            table[s1].push_back(s2);
+        }
+        *index = (i+1);
     }
 
     void decompress(std::vector<unsigned char>& in, int *index, unsigned char*buffer, int*line_size, n_tree* top1, n_tree* top2, std::vector<unsigned char>& decomp){
@@ -419,13 +447,15 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
         int m_line_size = 0;
         int m_index = 0;
         //ヘッダーのtreeを読み取る
-        reading_tree(in,&m_index,&m_buffer,&m_line_size,table1);
-        reading_tree(in,&m_index,&m_buffer,&m_line_size,table2);
+        reading_tree(in,&m_index,&m_buffer,&m_line_size,table1,word_size_bit);
+        reading_tree(in,&m_index,&m_buffer,&m_line_size,table2,windowsize_bit);
 
         //depthのtableからハフマン木を作成
         n_tree* n_tree_top1 = make_normalized_tree(table1);
         n_tree* n_tree_top2 = make_normalized_tree(table2);
-
+        
+        n_tree_top1->print(0);
+        n_tree_top2->print(0);
         depth_table().swap(table1);
         depth_table().swap(table2);
 
