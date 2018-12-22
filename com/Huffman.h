@@ -159,6 +159,26 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
                 m_left->table_input(table,d+1,n_root);
             }
         }
+        unsigned int decompress(unsigned int buffer, int* line_size){
+            if(m_right == nullptr && m_left == nullptr){
+                std::cout << "n_tree: buffer: " << buffer << " size: " << (*line_size) << " val: " << m_val << std::endl;
+                return m_val;
+            }
+            if(buffer < (1 << 31) ){
+                buffer <<= 1;
+                (*line_size) += 1;
+                assert(m_left != nullptr);
+                std::cout <<" l ";
+                return m_left->decompress(buffer, line_size);
+            }else{
+                buffer <<= 1;
+                (*line_size) += 1;
+                assert(m_right != nullptr);
+                std::cout <<" r ";
+                return m_right->decompress(buffer, line_size);                
+            }
+        }
+
 
     };
     //ハフマン木から深さごとに集計する
@@ -402,7 +422,7 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
         n_tree_table().swap(n_tree_table2);
     }
 
-    void reading_tree(std::vector<unsigned char>& in, int *index, unsigned char*buffer, int*line_size, depth_table &table, int bit_size){
+    void reading_tree(std::vector<unsigned char>& in, int *index, unsigned int*buffer, int*line_size, depth_table &table, int bit_size){
         
         int i=(*index);
         bool is_first = true;
@@ -434,7 +454,94 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
         *index = (i);
     }
 
-    void decompress(std::vector<unsigned char>& in, int *index, unsigned char*buffer, int*line_size, n_tree* top1, n_tree* top2, std::vector<unsigned char>& decomp){
+    int buffer_read(std::vector<unsigned char>& in, int *index,unsigned int*buffer, int line_size, int*buffer_flow_size){
+        unsigned int m_buffer = (*buffer);
+        while((*buffer_flow_size) + line_size >= 8 && in.size() > (*index)){
+            unsigned char temp = in[(*index)];
+            int m_flow = 8 -(*buffer_flow_size);
+            temp &= (1<<( m_flow ));
+            temp <<= (line_size - m_flow);
+            m_buffer |= (unsigned char)temp;
+
+            line_size -= m_flow;
+            (*buffer_flow_size) = 0;
+            (*index) = (*index) + 1 ;
+        }
+        if(line_size > 0){
+            unsigned char temp = in[(*index)];
+            int m_flow = 8 -(*buffer_flow_size);
+            temp &= (1<<( m_flow ));
+            temp >>= (m_flow - line_size);
+            m_buffer |=  (unsigned char)temp;
+            (*buffer_flow_size) += line_size;
+        }
+
+        if(in.size() >= (*index)){
+             return 32 - line_size;
+        }else{
+            return 32;
+        }
+    }
+
+    void decompress(std::vector<unsigned char>& in, int *index, unsigned int*buffer, int*line_size, n_tree* top1, n_tree* top2, std::vector<unsigned char>& decomp){
+        int m_index = (*index);
+        unsigned int m_buffer = (*buffer);
+        int buffer_flow_size = 0;
+        int left_buffer_size = 32;
+        m_buffer = 0;
+        //init
+        m_buffer |= (unsigned int)in[m_index++];
+        m_buffer <<= 8;
+        m_buffer |= (unsigned int)in[m_index++];
+        m_buffer <<= 8;
+        m_buffer |= (unsigned int)in[m_index++];
+        m_buffer <<= 8;
+        m_buffer |= (unsigned int)in[m_index++];        
+
+        while(left_buffer_size > 0){
+            std::cout << std::hex << m_buffer << std::endl;
+            i++;
+            int using_buffer = 0;
+            //LZSS
+            if(m_buffer >> 31 == 1){
+                m_buffer <<= 1;
+                int m_line_size = 0;
+                unsigned int val = top2->decompress(m_buffer, &m_line_size);
+                m_buffer <<= m_line_size;
+                unsigned short lzss = 1;
+                lzss <<= windowsize_bit;
+                lzss |= (unsigned short)val;
+                lzss <<= length_bit;
+                lzss |= (unsigned short)(m_buffer >> (32-length_bit));
+                
+                unsigned char s1 = lzss >> 8;
+                unsigned char s2 = lzss & 0xff;
+                decomp.push_back(s1);
+                decomp.push_back(s2);
+                std::cout << "s1: " << (int)s1 << " s2: " << (int)s2 << std::endl;
+                m_buffer <<= length_bit;
+                using_buffer = 1 + m_line_size + length_bit;
+                if(left_buffer_size == 32){
+                    left_buffer_size = buffer_read(in, &m_index, &m_buffer, using_buffer, &buffer_flow_size);
+                }
+            }else{
+                m_buffer <<= 1;
+                int m_line_size = 0;
+                unsigned int val = top1->decompress(m_buffer, &m_line_size);
+                decomp.push_back((unsigned char)val);
+                std::cout << "val: " << (int)val << std::endl;
+                m_buffer <<= m_line_size;
+                using_buffer = 1 + m_line_size;
+                if(left_buffer_size == 32){
+                    left_buffer_size = buffer_read(in, &m_index, &m_buffer, using_buffer, &buffer_flow_size);
+                }
+            }
+            if(left_buffer_size < 32 || in.size() >= m_index){
+                left_buffer_size -= using_buffer;
+            }
+        }
+        (*index) = m_index;
+        (*buffer) = m_buffer;
 
     }    
 
@@ -443,7 +550,7 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
         depth_table table1;
         depth_table table2;
 
-        unsigned char m_buffer = 0;
+        unsigned int m_buffer = 0;
         int m_line_size = 0;
         int m_index = 0;
         //ヘッダーのtreeを読み取る
@@ -453,8 +560,15 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
         n_tree* n_tree_top1 = make_normalized_tree(table1);
         n_tree* n_tree_top2 = make_normalized_tree(table2);
         
-        n_tree_top1->print(0);
-        n_tree_top2->print(0);
+        //bufferがint(32bit)じゃ足りなくなる
+        assert(table1.size() <= 32);
+        assert(table2.size() <= 32);
+        //n_tree_top1->print(0);
+        //n_tree_top2->print(0);
+
+        decompress(in,&m_index,&m_buffer,&m_line_size,n_tree_top1,n_tree_top2,decomp);
+
+
         depth_table().swap(table1);
         depth_table().swap(table2);
 
