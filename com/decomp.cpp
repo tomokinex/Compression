@@ -83,8 +83,6 @@ int main(int argc, char** argv){
 	}
 	byte_counter_out += decomp2.size();
 
-	cout << outfilename << " size: " << byte_counter_out << " byte ("  << 100.0*byte_counter_out / byte_counter_in << "%)" << endl;
-
 
 	outfp.close();
 	//free

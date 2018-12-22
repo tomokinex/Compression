@@ -46,50 +46,43 @@ int main(int argc, char** argv){
 	infp.close();
 	byte_counter_in += file.size();
 	cout << infilename << " size: " << byte_counter_in << "byte" << endl;
-	/*
+	
 	cout << "before" << endl;
 	for(int i=0;i<file.size();i++){
 		cout << i << " : ";
 		cout << hex << showbase << (int)file[i] << endl;
 	}
-	*/
+	
 	LZSS::LZSS_compress(file, comp1);
 	cout << "after LZSS size: " << comp1.size() << "byte" << endl;
-	/*
+	
 	cout << "after1" << endl;
 	for(int i=0;i<comp1.size();i++){
 		cout << i << " : ";
 		cout << hex << showbase << (int)comp1[i] << endl;
 	}
-	*/
+	
 	Huff::Huff_compress(comp1,comp2);
 
 	cout << "after Huffman size: " << comp2.size() << "byte" << endl;
 
-	/*
+	
 	cout << "after2" << endl;
 	for(int i=0;i<comp2.size();i++){
 		cout << i << " : ";
 		cout << (int)comp2[i] << endl;
 	}
-	*/
+	
 
 
 	std::ofstream  outfp( outfilename, std::ios::binary );
 
-	if(comp1.size() > comp2.size()){
-		for(int i=0;i<comp2.size();i++){
-		  	outfp.write( reinterpret_cast<char*>(&comp2[i]), sizeof(unsigned char) );
-		}
-			//cout << "ZSS + Huffman" << endl;
-			byte_counter_out += comp2.size();
-		}else{
-		for(int i=0;i<comp1.size();i++){
-		  	outfp.write( reinterpret_cast<char*>(&comp1[i]), sizeof(unsigned char) );
-		}
-			byte_counter_out += comp1.size();
-			//cout << "LZSS only " << endl;
+	for(int i=0;i<comp2.size();i++){
+		outfp.write( reinterpret_cast<char*>(&comp2[i]), sizeof(unsigned char) );
 	}
+	//cout << "ZSS + Huffman" << endl;
+	byte_counter_out += comp2.size();
+		
 	//cout << outfilename << " size: " << byte_counter_out << " byte ("  << 100.0*byte_counter_out / byte_counter_in << "%)" << endl;
 
 
