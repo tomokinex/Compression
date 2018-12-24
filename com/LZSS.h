@@ -174,7 +174,7 @@ class ring_buffer{
             int head = 0;
             int len = 0;
             if(decompress(s1,s2,&head,&len)){
-                std::cout << "head: " << head << " len: " << len << std::endl;
+                //std::cout << "head: " << head << " len: " << len << std::endl;
                 //if(head > len){
                     int t_decomp_size = decomp.size();
                     for(int j=0;j<len;j++){

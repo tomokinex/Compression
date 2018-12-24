@@ -40,7 +40,6 @@ int main(int argc, char** argv){
 	
 	while(!infp.eof()){
 		infp.read((char*)&c, sizeof(unsigned char));
-		//cout << (int)c << endl;
 		file.push_back(c);
 	}
 	infp.close();
@@ -63,7 +62,7 @@ int main(int argc, char** argv){
 		cout << hex << showbase << (int)comp1[i] << endl;
 	}
 	*/
-	//LZSS::LZSS_decompress(decomp1, decomp2);
+	LZSS::LZSS_decompress(decomp1, decomp2);
 
 	cout << "after LZSS size: " << decomp2.size() << "byte" << endl;
 
@@ -74,16 +73,13 @@ int main(int argc, char** argv){
 		cout << (int)comp2[i] << endl;
 	}
 	*/
-
-
 	std::ofstream  outfp( outfilename, std::ios::binary );
 
 	for(int i=0;i<decomp2.size();i++){
 		outfp.write( reinterpret_cast<char*>(&decomp2[i]), sizeof(unsigned char) );
 	}
 	byte_counter_out += decomp2.size();
-
-
+	
 	outfp.close();
 	//free
 

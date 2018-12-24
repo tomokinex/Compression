@@ -144,7 +144,6 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
 
             if(m_right == nullptr && m_left == nullptr){
                table[m_val] = std::pair<int, unsigned int>(d, root); 
-               //std::cout << "val: " << (int)m_val << " d: " << d << " root: " << root << std::endl;
             }
 
             if(m_right != nullptr){
@@ -161,25 +160,23 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
         }
         unsigned int decompress(unsigned int buffer, int* line_size){
             if(m_right == nullptr && m_left == nullptr){
-                std::cout << "n_tree: buffer: " << buffer << " size: " << (*line_size) << " val: " << m_val << std::endl;
+                //std::cout << "n_tree: buffer: " << buffer << " size: " << (*line_size) << " val: " << (int)m_val << std::endl;
                 return m_val;
             }
             if(buffer < (1 << 31) ){
                 buffer <<= 1;
                 (*line_size) += 1;
                 assert(m_left != nullptr);
-                std::cout <<" l ";
+                //std::cout <<" l ";
                 return m_left->decompress(buffer, line_size);
             }else{
                 buffer <<= 1;
                 (*line_size) += 1;
                 assert(m_right != nullptr);
-                std::cout <<" r ";
+                //std::cout <<" r ";
                 return m_right->decompress(buffer, line_size);                
             }
         }
-
-
     };
     //ハフマン木から深さごとに集計する
     void normalize_tree(std::vector<tree> &hist, depth_table &comp_tree){
@@ -264,7 +261,6 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
 
     //bit単位でfile入力するマン
     void push_bit_entry(std::vector<unsigned char>& comp,unsigned char* buffer, int* line, unsigned int push_line, int push_line_size){
-        //std::cout << "push line: " << push_line << " line_size: " << push_line_size << std::endl;
         int left_size = push_line_size;
         unsigned char m_buffer = *buffer;
         int m_line = *line; 
@@ -278,7 +274,6 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
             m_buffer = 0;
             left_size -= t_push_size;
             m_line = 0;
-            //std::cout << "push!" << std::endl;
         }
         if(left_size > 0){
             m_buffer <<= left_size;
@@ -290,7 +285,6 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
             *line = m_line;
             *buffer = m_buffer;
         }
-        //std::cout << "left: " << (*line) << std::endl;
     }
 
     //2種類のハフマン化を施す
@@ -354,6 +348,15 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
 
     //main
     void Huff_compress(std::vector<unsigned char>& file, std::vector<unsigned char>& comp){
+
+        //先頭に非圧縮でのファイルサイズを入力(16bit)
+        unsigned int init_size = file.size();
+        unsigned char s1 = (unsigned char)(init_size >> 8);
+        unsigned char s2 = (unsigned char)(init_size & 0xff);
+        comp.push_back(s1);
+        comp.push_back(s2);
+        std::cout << "huff filesize: " << init_size << std::endl;
+        std::cout << "s1: " << (unsigned int)s1 << " s2: " << (unsigned int)s2 << std::endl;
 
         //集計＆正規化前のハフマン木
         std::vector<tree> tree1(1 << word_size_bit);
@@ -456,12 +459,18 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
 
     int buffer_read(std::vector<unsigned char>& in, int *index,unsigned int*buffer, int line_size, int*buffer_flow_size){
         unsigned int m_buffer = (*buffer);
+        //std::cout << "buffer_read start" << std::endl;
+        //std::cout << "m_buffer: " << (*buffer) << std::endl;
+        //std::cout << "buffer_flow_size: " << (*buffer_flow_size) << std::endl;
+        //std::cout << "line_size: " << line_size << std::endl;
         while((*buffer_flow_size) + line_size >= 8 && in.size() > (*index)){
             unsigned char temp = in[(*index)];
             int m_flow = 8 -(*buffer_flow_size);
-            temp &= (1<<( m_flow ));
+            temp &= (1<<( m_flow )-1);
             temp <<= (line_size - m_flow);
-            m_buffer |= (unsigned char)temp;
+
+            //std::cout <<"w_temp: " << (unsigned int)temp << std::endl;
+            m_buffer |= (unsigned int)temp;
 
             line_size -= m_flow;
             (*buffer_flow_size) = 0;
@@ -470,20 +479,23 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
         if(line_size > 0){
             unsigned char temp = in[(*index)];
             int m_flow = 8 -(*buffer_flow_size);
-            temp &= (1<<( m_flow ));
+            temp &= ((1<< m_flow )-1);
             temp >>= (m_flow - line_size);
-            m_buffer |=  (unsigned char)temp;
+            //std::cout <<"i_temp: " << (unsigned int)temp << std::endl;
+            m_buffer |=  (unsigned int)temp;
             (*buffer_flow_size) += line_size;
         }
-
-        if(in.size() >= (*index)){
+        (*buffer) = m_buffer;
+        //std::cout << "m_buffer: " << (*buffer) << std::endl;
+        //std::cout << "buffer_read end" << std::endl;    
+        if(in.size() >= (*index) && (*buffer_flow_size) >= 8){
              return 32 - line_size;
         }else{
             return 32;
         }
     }
 
-    void decompress(std::vector<unsigned char>& in, int *index, unsigned int*buffer, int*line_size, n_tree* top1, n_tree* top2, std::vector<unsigned char>& decomp){
+    void decompress(std::vector<unsigned char>& in, int *index, unsigned int*buffer, int*line_size, n_tree* top1, n_tree* top2, std::vector<unsigned char>& decomp, int huff_size){
         int m_index = (*index);
         unsigned int m_buffer = (*buffer);
         int buffer_flow_size = 0;
@@ -498,9 +510,9 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
         m_buffer <<= 8;
         m_buffer |= (unsigned int)in[m_index++];        
 
-        while(left_buffer_size > 0){
-            std::cout << std::hex << m_buffer << std::endl;
-            i++;
+        int it = 0;
+        while(left_buffer_size > 0 && it < huff_size){
+            //std::cout << "ini_buffer " << m_buffer << std::endl;
             int using_buffer = 0;
             //LZSS
             if(m_buffer >> 31 == 1){
@@ -518,31 +530,32 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
                 unsigned char s2 = lzss & 0xff;
                 decomp.push_back(s1);
                 decomp.push_back(s2);
-                std::cout << "s1: " << (int)s1 << " s2: " << (int)s2 << std::endl;
+                //std::cout << "s1: " << (int)s1 << " s2: " << (int)s2 << std::endl;
                 m_buffer <<= length_bit;
                 using_buffer = 1 + m_line_size + length_bit;
                 if(left_buffer_size == 32){
                     left_buffer_size = buffer_read(in, &m_index, &m_buffer, using_buffer, &buffer_flow_size);
                 }
+                it += 2;
             }else{
                 m_buffer <<= 1;
                 int m_line_size = 0;
                 unsigned int val = top1->decompress(m_buffer, &m_line_size);
                 decomp.push_back((unsigned char)val);
-                std::cout << "val: " << (int)val << std::endl;
+                //std::cout << "val: " << (int)val << std::endl;
                 m_buffer <<= m_line_size;
                 using_buffer = 1 + m_line_size;
                 if(left_buffer_size == 32){
                     left_buffer_size = buffer_read(in, &m_index, &m_buffer, using_buffer, &buffer_flow_size);
                 }
+                it++;
             }
-            if(left_buffer_size < 32 || in.size() >= m_index){
+            if(in.size() >= m_index && buffer_flow_size >= 8){
                 left_buffer_size -= using_buffer;
             }
         }
         (*index) = m_index;
         (*buffer) = m_buffer;
-
     }    
 
     void Huff_decompress(std::vector<unsigned char>& in, std::vector<unsigned char>& decomp){
@@ -553,6 +566,16 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
         unsigned int m_buffer = 0;
         int m_line_size = 0;
         int m_index = 0;
+
+        //ファイルサイズを取得する
+        int huff_size;
+        unsigned char s1;
+        unsigned char s2;
+        s1 = in[m_index++];
+        s2 = in[m_index++];
+        huff_size = ((unsigned int)s1 << 8) | (unsigned int)s2;
+        std::cout << "huff size: " << huff_size << std::endl;
+
         //ヘッダーのtreeを読み取る
         reading_tree(in,&m_index,&m_buffer,&m_line_size,table1,word_size_bit);
         reading_tree(in,&m_index,&m_buffer,&m_line_size,table2,windowsize_bit);
@@ -563,22 +586,13 @@ typedef std::vector<std::vector<unsigned int>> depth_table;
         //bufferがint(32bit)じゃ足りなくなる
         assert(table1.size() <= 32);
         assert(table2.size() <= 32);
-        //n_tree_top1->print(0);
-        //n_tree_top2->print(0);
-
-        decompress(in,&m_index,&m_buffer,&m_line_size,n_tree_top1,n_tree_top2,decomp);
-
-
         depth_table().swap(table1);
         depth_table().swap(table2);
 
         //ハフマン木を用いて解凍
-    
-
+        decompress(in,&m_index,&m_buffer,&m_line_size,n_tree_top1,n_tree_top2,decomp, huff_size);
 
         delete n_tree_top1;
         delete n_tree_top2;
-
-
     }
 }
